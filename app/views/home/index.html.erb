@@ -1,0 +1,351 @@
+<% content_for :head do %>
+    <style>
+        body { font-size: 12pt; }
+        label, input { display:block; }
+        input.text { margin-bottom:12px; width:95%; padding: .4em; }
+        select { margin-bottom:12px; width:95%; padding: .4em; }
+        fieldset { padding:0; border:0; margin-top:25px; }
+        h1 { font-size: 17pt; margin: .6em 0; }
+        div#tasks-contain { width: 650px; margin: 20px 0; }
+        div#tasks-contain table { margin: 1em 0; border-collapse: collapse; width: 100%; }
+        div#tasks-contain table td, div#users-contain table th { border: 1px solid #eee; padding: .6em 10px; text-align: left; }
+        .ui-dialog .ui-state-error { padding: .3em; }
+        .validateTips { border: 1px solid transparent; padding: 0.3em; }
+    </style>
+
+    <script>
+    $(function() {
+		$.fn.serializeFormJSON = function() {
+
+		   var o = {};
+		   var a = this.serializeArray();
+		   $.each(a, function() {
+			   if (o[this.name]) {
+				   if (!o[this.name].push) {
+				       o[this.name] = [o[this.name]];
+				   }
+				   o[this.name].push(this.value || '');
+			   } else {
+				   o[this.name] = this.value || '';
+			   }
+		   });
+		   return o;
+		};    
+    
+		$( "#duedate" ).datepicker();
+
+        var identifier = $( "#identifier" ),
+            description = $( "#description" ),
+            duedate = $( "#duedate" ),
+            priority = $( "#priority" ),
+            done = $( "#done" ), 
+            allFields = $( [] ).add( description ).add( duedate ).add( priority ),
+            tips = $( ".validateTips" );
+            
+		var isValidDate = function (value) {
+			var match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value),
+			isDate = function (m, d, y) {
+				return m > 0 && m < 13 && y > 0 && y < 32768 && d > 0 && d <= (new Date(y, m, 0)).getDate();
+			};
+			return match && isDate(match[1], match[2], match[3]);
+		}            
+ 
+        function updateTips( t ) {
+            tips
+                .text( t )
+                .addClass( "ui-state-highlight" );
+            setTimeout(function() {
+                tips.removeClass( "ui-state-highlight", 1500 );
+            }, 500 );
+        }
+ 
+        function checkLength( o, n, min, max ) {
+            if ( o.val().length > max || o.val().length < min ) {
+                o.addClass( "ui-state-error" );
+                updateTips( "Length of " + n + " must be between " +
+                    min + " and " + max + "." );
+                return false;
+            } else {
+                return true;
+            }
+        }
+        
+        function checkPriority(o) {
+            if (o.val() == 0) {
+                o.addClass( "ui-state-error" );
+                updateTips( "You must set a priority!" );
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        function checkDate(o) {
+        	if(! isValidDate(o.val())) {
+                o.addClass( "ui-state-error" );
+                updateTips( "Invalid date!" );
+                return false;
+        	}
+        
+        	var d = $.datepicker.parseDate("mm/dd/yy", o.val())
+        	
+            if (d < new Date()) {
+                o.addClass( "ui-state-error" );
+                updateTips( "You can't create tasks with due date on past!" );
+                return false;
+            } else {
+                return true;
+            }
+        }        
+ 
+        $( "#dialog-form" ).dialog({
+            autoOpen: false,
+            height: 480,
+            width: 350,
+            modal: true,
+            buttons: {
+                "Save": function() {
+                    var bValid = true;
+                    allFields.removeClass( "ui-state-error" );
+ 
+					bValid = bValid && checkLength( description, "description", 1, 40 );
+					bValid = bValid && checkDate(duedate);
+					bValid = bValid && checkPriority(priority);
+ 
+                    if ( bValid ) {
+						var action = '<%= tasks_path %>';
+						
+						if(!$.trim(identifier.val()).length) {
+							$.ajax({
+								type: "POST",
+								url: action + ".json",
+								data: $.toJSON($("#taskForm").serializeFormJSON()),
+						  		success: function(data) {
+									addTask(data);
+				                    $("#dialog-form").dialog( "close" );
+							  	},
+					  	        contentType: "application/json",
+							  	dataType: "json"
+							});
+						}
+						else {
+							var id = identifier.val();
+							
+							$.ajax({
+								type: "PUT",
+								url: action + ".json?id=" + id,
+								data: $.toJSON($("#taskForm").serializeFormJSON()),
+						  		success: function(data) {
+							  		$( "#tasks tbody" ).empty();
+									for(i = 0; i < data.length; i++)
+										addTask(data[i]);
+				                    $("#dialog-form").dialog( "close" );
+							  	},
+					  	        contentType: "application/json",
+							  	dataType: "json"
+							});
+						}	
+                    }
+                },
+                Cancel: function() {
+                    $( this ).dialog( "close" );
+                }
+            },
+            close: function() {
+                allFields.val( "" ).removeClass( "ui-state-error" );
+            }
+        });
+ 
+        $( "#create-task" )
+            .button()
+            .click(function() {
+            	identifier.val("");
+                $( "#dialog-form" ).dialog( "open" );
+        	});
+    });
+
+    function decodePriority(id) {
+    
+    	var name = "";
+    	switch(id) {
+    
+    		case 1:
+    			name = "High";
+    			break;
+
+    		case 2:
+    			name = "Medium";
+    			break;
+
+    		case 3:
+    			name = "Low";
+    			break;
+    	}
+    	
+    	return name;
+    }
+
+    function decodeDone(done) {
+
+		if(done) {
+			return "&#x2713;";
+		}
+		else {
+			return "";
+		}
+	}    
+	
+    function addTask(data) {
+    	var d = $.datepicker.parseDate("yy-mm-dd", data.duedate);
+    	
+        $("#tasks > tbody:last").append( "<tr>" +
+            "<td>" + decodeDone(data.done) + "</td>" +
+            "<td>" + data.description + "</td>" +
+            "<td>" + decodePriority(data.priority) + "</td>" +
+            "<td>" + $.datepicker.formatDate( "mm/dd/yy", d) + "</td>" +
+			"<td><button id=\"edit-task\" onclick=\"editTask(" + data.id + ")\">Edit</button></td>" +
+			"<td><button id=\"delete-task\" onclick=\"deleteTask(" + data.id + ")\">Delete</button></td>" +
+        "</tr>" );
+    }	
+
+	function editTask(id) {
+
+		var action = '<%= tasks_path %>'		
+
+		$.get(action + "/edit.json", { id: id },
+			function(data) {
+				var d = $.datepicker.parseDate("yy-mm-dd", data.duedate);
+			
+				$("#identifier").val(data.id);
+				$("#description").val(data.description);
+				$("#duedate").val($.datepicker.formatDate( "mm/dd/yy", d));
+				$("#priority").val(data.priority);
+				$("#done").attr('checked', data.done);
+				
+				$( "#dialog-form" ).dialog( "open" );
+			}, "json"
+		);
+	}
+
+	function deleteTask(id) {
+	
+		var action = '<%= tasks_path %>'		
+
+		var confirmed = confirm("Are you sure that you want to delete this task?");
+		if(confirmed) {
+			$.ajax({
+				type: "DELETE",
+				url: action + ".json?id=" + id,
+		  		success: function(data) {
+			  		$( "#tasks tbody" ).empty();
+					for(i = 0; i < data.length; i++)
+						addTask(data[i]);
+			  	},
+			  	dataType: "json"
+			});
+		}	
+	}
+	
+	function sortTasks(column, field) {
+	
+		var action = '<%= tasks_path %>'		
+		
+		var sortDirection = $("#" + field + "_sort_direction");
+		
+		if(!$.trim(sortDirection.val()).length)
+			sortDirection.val("ASC");
+			
+		var direction = sortDirection.val();
+		
+		if(field == "priority") {
+			$(column).next("th").html("Due Date");
+			$(column).html("Priority " + (direction == "ASC" ? "&#9660" : "&#9650"));
+		}
+		else {
+			$(column).prev("th").html("Priority");
+			$(column).html("Due Date " + (direction == "ASC" ? "&#9660" : "&#9650"));
+		}
+		$.ajax({
+			type: "GET",
+			url: action + "/sort.json?field=" + field + "&direction=" + direction,
+	  		success: function(data) {
+		  		$( "#tasks tbody" ).empty();
+				for(i = 0; i < data.length; i++)
+					addTask(data[i]);
+		  	},
+		  	dataType: "json"
+		});
+		
+		if(direction == "ASC")
+			sortDirection.val("DESC");
+		else
+			sortDirection.val("ASC");
+	}
+    </script>
+<% end %>
+
+<div id="dialog-form" title="Create new task">
+    <p class="validateTips">All form fields are required.</p>
+ 
+    <form id="taskForm">
+    	<fieldset>
+        	<label for="description">Description</label>
+		    <input type="text" name="description" id="description" class="text ui-widget-content ui-corner-all" />
+		    <label for="email">Due Date</label>
+		    <input type="duedate" name="duedate" id="duedate" value="" class="text ui-widget-content ui-corner-all" />
+		    <label for="priority">Priority</label>
+			<select name="priority" id="priority" class="text ui-widget-content ui-corner-all">
+				<option value="0">Choose</option>
+				<option value="1">High</option>
+				<option value="2">Medium</option>
+				<option value="3">Low</option>
+			</select>
+		    <label for="done">Done</label>
+		    <input type="checkbox" name="done" id="done" />
+	    </fieldset>
+    </form>
+</div>
+
+<h1>Todo</h1>
+
+<% if ! @tasks.empty? %> 
+  <div id="tasks-contain" class="ui-widget">
+    <table id="tasks" class="ui-widget ui-widget-content">
+      <thead class="ui-widget-header">
+        <tr>
+          <th>Done</th>
+          <th>Description</th>
+          <th onclick="sortTasks(this, 'priority')">Priority</th>
+          <th onclick="sortTasks(this, 'duedate')">Due Date</th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+ 
+    <% @tasks.each do |task| %>
+      <tbody>
+        <tr>
+          <td><%= raw decode_done(task) %></td>
+          <td><%= task.description %></td>
+          <td><%= decode_priority(task) %></td>
+          <td><%= l task.duedate, :format => :todo_date %></td>
+          <td><button id="edit-task" onclick="editTask(<%= task.id %>)">Edit</button></td>
+          <td><button id="delete-task" onclick="deleteTask(<%= task.id %>)">Delete</button></td>
+        </tr>
+      </tbody>
+    <% end %>
+    </table>
+  </div>
+<% else	%>
+  <big>
+     <span>No tasks created!</span>
+  </big>
+<% end %>
+ 
+<br />
+ 
+<button id="create-task">Create new task</button>
+
+<input type="hidden" id="identifier" />
+<input type="hidden" id="duedate_sort_direction" />
+<input type="hidden" id="priority_sort_direction" />
