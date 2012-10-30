@@ -1,7 +1,8 @@
 class HomeController < ApplicationController
 
   def index
-     @tasks = Task.find(:all, :order => "id ASC")
+   	 @user  = current_user
+     @tasks = @user.tasks.ordered
  
      respond_to do |format|
         format.html

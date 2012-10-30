@@ -33,6 +33,16 @@
 		};    
     
 		$( "#duedate" ).datepicker();
+		
+		<% if ! @tasks.empty? %>
+		    $( "#tasks-contain" ).show()
+		    $( "#tasks-message" ).hide()
+		<% else %>
+			$( "#tasks" ).append("<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>");
+			$( "#tasks > tbody" ).empty();
+		    $( "#tasks-contain" ).hide()
+		    $( "#tasks-message" ).show()
+		<% end 	%>
 
         var identifier = $( "#identifier" ),
             description = $( "#description" ),
@@ -160,6 +170,8 @@
             .button()
             .click(function() {
             	identifier.val("");
+            	done.attr('checked', false);
+            	allFields.val( "" ).removeClass( "ui-state-error" );
                 $( "#dialog-form" ).dialog( "open" );
         	});
     });
@@ -198,14 +210,17 @@
     function addTask(data) {
     	var d = $.datepicker.parseDate("yy-mm-dd", data.duedate);
     	
-        $("#tasks > tbody:last").append( "<tr>" +
-            "<td>" + decodeDone(data.done) + "</td>" +
-            "<td>" + data.description + "</td>" +
-            "<td>" + decodePriority(data.priority) + "</td>" +
-            "<td>" + $.datepicker.formatDate( "mm/dd/yy", d) + "</td>" +
+	    $("#tasks > tbody:last").append( "<tr>" +
+	        "<td>" + decodeDone(data.done) + "</td>" +
+	        "<td>" + data.description + "</td>" +
+	        "<td>" + decodePriority(data.priority) + "</td>" +
+	        "<td>" + $.datepicker.formatDate( "mm/dd/yy", d) + "</td>" +
 			"<td><button id=\"edit-task\" onclick=\"editTask(" + data.id + ")\">Edit</button></td>" +
 			"<td><button id=\"delete-task\" onclick=\"deleteTask(" + data.id + ")\">Delete</button></td>" +
-        "</tr>" );
+	    "</tr>" );
+		        
+		$( "#tasks-contain" ).show()
+		$( "#tasks-message" ).hide()
     }	
 
 	function editTask(id) {
@@ -238,8 +253,14 @@
 				url: action + ".json?id=" + id,
 		  		success: function(data) {
 			  		$( "#tasks tbody" ).empty();
-					for(i = 0; i < data.length; i++)
-						addTask(data[i]);
+			  		if(data.length == 0) {
+						$( "#tasks-contain" ).hide()
+						$( "#tasks-message" ).show()
+			  		}
+			  		else {
+						for(i = 0; i < data.length; i++)
+							addTask(data[i]);
+					}
 			  	},
 			  	dataType: "json"
 			});
@@ -308,39 +329,38 @@
 
 <h1>Todo</h1>
 
-<% if ! @tasks.empty? %> 
-  <div id="tasks-contain" class="ui-widget">
-    <table id="tasks" class="ui-widget ui-widget-content">
-      <thead class="ui-widget-header">
-        <tr>
-          <th>Done</th>
-          <th>Description</th>
-          <th onclick="sortTasks(this, 'priority')">Priority</th>
-          <th onclick="sortTasks(this, 'duedate')">Due Date</th>
-          <th></th>
-          <th></th>
-        </tr>
-      </thead>
- 
-    <% @tasks.each do |task| %>
-      <tbody>
-        <tr>
-          <td><%= raw decode_done(task) %></td>
-          <td><%= task.description %></td>
-          <td><%= decode_priority(task) %></td>
-          <td><%= l task.duedate, :format => :todo_date %></td>
-          <td><button id="edit-task" onclick="editTask(<%= task.id %>)">Edit</button></td>
-          <td><button id="delete-task" onclick="deleteTask(<%= task.id %>)">Delete</button></td>
-        </tr>
-      </tbody>
-    <% end %>
-    </table>
-  </div>
-<% else	%>
-  <big>
-     <span>No tasks created!</span>
-  </big>
-<% end %>
+<div id="tasks-contain" class="ui-widget">
+	<table id="tasks" class="ui-widget ui-widget-content">
+		<thead class="ui-widget-header">
+			<tr>
+				<th>Done</th>
+				<th>Description</th>
+				<th onclick="sortTasks(this, 'priority')">Priority</th>
+				<th onclick="sortTasks(this, 'duedate')">Due Date</th>
+				<th></th>
+				<th></th>
+			</tr>
+		</thead>
+
+		<% @tasks.each do |task| %>
+		<tbody>
+			<tr>
+				<td><%= raw decode_done(task) %></td>
+				<td><%= task.description %></td>
+				<td><%= decode_priority(task) %></td>
+				<td><%= l task.duedate, :format => :todo_date %></td>
+				<td><button id="edit-task" onclick="editTask(<%= task.id %>)">Edit</button></td>
+				<td><button id="delete-task" onclick="deleteTask(<%= task.id %>)">Delete</button></td>
+			</tr>
+		</tbody>
+		<% end %>
+	</table>
+</div>
+<div id="tasks-message">
+	<big>
+		<span>No tasks created!</span>
+	</big>
+</div>
  
 <br />
  

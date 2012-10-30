@@ -1,8 +1,18 @@
 class TasksController < ApplicationController
 
+  def index
+  	@user  = current_user
+    @tasks = @user.tasks.ordered
+ 
+    respond_to do |format|
+      format.json  { render :json => @tasks }
+    end
+  end
+
   def create
      @task = Task.new(params[:task])
-
+	 @task.user = current_user
+	
      respond_to do |format|
 		if @task.save
            format.json { render :json => @task }
@@ -15,7 +25,8 @@ class TasksController < ApplicationController
 
      respond_to do |format|
 		if @task.update_attributes(params[:task])
-		   @tasks = Task.find(:all, :order => "id")
+  	       @user  = current_user
+	       @tasks = @user.tasks.ordered.reload
            format.json { render :json => @tasks }
 		end
      end
@@ -33,15 +44,16 @@ class TasksController < ApplicationController
      @task = Task.find(params[:id])
      @task.destroy
 
-     @tasks = Task.find(:all, :order => "id")
- 
      respond_to do |format|
+        @user  = current_user
+        @tasks = @user.tasks.ordered.reload
         format.json { render :json => @tasks } 
      end
   end
 
   def sort
-     @tasks = Task.find(:all, :order => params[:field] << " " <<  params[:direction])
+     @user  = current_user
+     @tasks = @user.tasks.all(:order => params[:field] << " " <<  params[:direction])
  
      respond_to do |format|
         format.json { render :json => @tasks }
