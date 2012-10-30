@@ -9,6 +9,15 @@ class TasksController < ApplicationController
     end
   end
 
+  def show
+  	@user  = current_user
+    @task = @user.tasks.where(:id => params[:id])
+ 
+    respond_to do |format|
+      format.json  { render :json => @task }
+    end
+  end
+
   def create
      @task = Task.new(params[:task])
 	 @task.user = current_user
