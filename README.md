@@ -8,6 +8,7 @@ it running properly you must first create the database
 like below:
 
 cd \path\to\todo
+
 rake db:migrate
 
 Now you must need create the users:
